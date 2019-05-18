@@ -120,7 +120,7 @@ func (l *Logger) Debugf(format string, args ...interface{}) error {
 // print emits a log message at the specified level.
 func (l *Logger) print(lv Level, args ...interface{}) error {
 	l.fields[levelKey] = lv
-	l.fields[tsKey] = time.Now()
+	l.fields[tsKey] = time.Now().Format(time.RFC3339Nano)
 	l.fields[msgKey] = fmt.Sprint(args...)
 	return l.emit()
 }
@@ -128,7 +128,7 @@ func (l *Logger) print(lv Level, args ...interface{}) error {
 // printf emits a formatted log message at the specified level.
 func (l *Logger) printf(lv Level, format string, args ...interface{}) error {
 	l.fields[levelKey] = lv
-	l.fields[tsKey] = time.Now()
+	l.fields[tsKey] = time.Now().Format(time.RFC3339Nano)
 	l.fields[msgKey] = fmt.Sprintf(format, args...)
 	return l.emit()
 }
