@@ -24,7 +24,8 @@ import (
 
 func TestLevels(t *testing.T) {
 	buf := new(bytes.Buffer)
-	logger := log.New(log.NewTextEncoder(buf), log.Quiet)
+	enc := &log.TextEncoder{Output: buf}
+	logger := log.New(enc, log.Quiet)
 
 	logger.Error("aterror")
 	logger.Info("atinfo")
@@ -67,4 +68,11 @@ func TestLevels(t *testing.T) {
 	if !strings.Contains(bs, "atdebug") {
 		t.Fatalf("didn't write at Debug level")
 	}
+}
+
+func TestTestEncoder(t *testing.T) {
+	enc := &log.TestLogEncoder{TB: t}
+	logger := log.New(enc, log.Debug)
+
+	logger.Infof("hello world from *testing.T %p", t)
 }

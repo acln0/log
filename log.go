@@ -30,6 +30,23 @@ import (
 // Level represents a log level.
 type Level uint32
 
+// String returns a textual representation of the log level. The strings are
+// "quiet", "error", "info", and "debug". If lv is not a supported log level,
+// String returns the empty string.
+func (lv Level) String() string {
+	switch lv {
+	case Quiet:
+		return "quiet"
+	case Error:
+		return "error"
+	case Info:
+		return "info"
+	case Debug:
+		return "debug"
+	}
+	return ""
+}
+
 // Supported log levels.
 const (
 	Quiet Level = iota
@@ -96,7 +113,7 @@ func (l *Logger) Info(args ...interface{}) error {
 // Infof emits a formatted log message at the Info level.
 func (l *Logger) Infof(format string, args ...interface{}) error {
 	if l.loadLevel() >= Info {
-		return l.print(Info, args...)
+		return l.printf(Info, format, args...)
 	}
 	return nil
 }
@@ -186,15 +203,11 @@ type Encoder interface {
 	Encode(Fields) error
 }
 
-// TextEncoder emits textual log messages to an output stream.
+// TextEncoder emits textual log messages to an output stream. TextEncoder
+// values must not be copied.
 type TextEncoder struct {
-	mu sync.Mutex
-	w  io.Writer
-}
-
-// NewTextEncoder constructs a new TextEncoder, which writes log lines to w.
-func NewTextEncoder(w io.Writer) *TextEncoder {
-	return &TextEncoder{w: w}
+	mu     sync.Mutex
+	Output io.Writer
 }
 
 // Encode encodes the specified fields to text, then writes them out.
@@ -204,19 +217,15 @@ func (tenc *TextEncoder) Encode(fields Fields) error {
 	tenc.mu.Lock()
 	defer tenc.mu.Unlock()
 
-	_, err := io.WriteString(tenc.w, fields.String()+"\n")
+	_, err := io.WriteString(tenc.Output, fields.String()+"\n")
 	return err
 }
 
-// JSONEncoder emits JSON objects to an output stream.
+// JSONEncoder emits JSON objects to an output stream. JSONEncoder values
+// must not be copied.
 type JSONEncoder struct {
-	mu sync.Mutex
-	w  io.Writer
-}
-
-// NewJSONEncoder constructs a new JSONEncoder, which writes JSON objects to w.
-func NewJSONEncoder(w io.Writer) *JSONEncoder {
-	return &JSONEncoder{w: w}
+	mu     sync.Mutex
+	Output io.Writer
 }
 
 // Encode encodes the specified fields to JSON, then writes them out.
@@ -236,20 +245,15 @@ func (jenc *JSONEncoder) Encode(fields Fields) error {
 	jenc.mu.Lock()
 	defer jenc.mu.Unlock()
 
-	_, err := jenc.w.Write(buf.Bytes())
+	_, err := jenc.Output.Write(buf.Bytes())
 	return err
 }
 
-// TestLogEncoder emits textual log messages to a *testing.T.
+// TestLogEncoder emits textual log messages to a testing.TB. TestLogEncoder
+// values must not be copied.
 type TestLogEncoder struct {
 	mu sync.Mutex
-	tb testing.TB
-}
-
-// NewTestLogEncoder constructs a new TestLogEncoder, which writes log lines
-// to tb's associated logger.
-func NewTestLogEncoder(tb testing.TB) *TestLogEncoder {
-	return &TestLogEncoder{tb: tb}
+	TB testing.TB
 }
 
 // Encode encodes the specified fields to text, then writes them to the
@@ -258,7 +262,7 @@ func (tle *TestLogEncoder) Encode(fields Fields) error {
 	tle.mu.Lock()
 	defer tle.mu.Unlock()
 
-	tle.tb.Log(fields.String() + "\n")
+	tle.TB.Log(fields.String())
 	return nil
 }
 
@@ -281,7 +285,7 @@ func (f Fields) String() string {
 		}
 		sb.WriteString(value)
 
-		if i < len(keys) - 1 {
+		if i < len(keys)-1 {
 			sb.WriteString(" ")
 		}
 	}
