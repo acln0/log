@@ -14,36 +14,57 @@
 
 package log_test
 
-/*
-
 import (
+	"bytes"
+	"strings"
 	"testing"
 
 	"acln.ro/log"
 )
 
-func TestEnterTask(t *testing.T) {
-	var log log.Logger
+func TestLevels(t *testing.T) {
+	buf := new(bytes.Buffer)
+	logger := log.New(log.NewTextEncoder(buf), log.Quiet)
 
-	ctx, tlog, task := log.ForTask(ctx, "something")
-	defer task.End()
+	logger.Error("aterror")
+	logger.Info("atinfo")
+	logger.Debug("atdebug")
 
+	if buf.Len() > 0 {
+		t.Fatalf("wrote logs at Quiet level: %q", buf.String())
+	}
 
+	logger.SetLevel(log.Error)
+
+	logger.Error("aterror")
+	logger.Info("atinfo")
+	logger.Debug("atdebug")
+
+	bs := buf.String()
+	if !strings.Contains(bs, "aterror") {
+		t.Fatalf("didn't write at Error level")
+	}
+	if strings.Contains(bs, "atinfo") || strings.Contains(bs, "atdebug") {
+		t.Fatalf("didn't respect Error level, got %q", bs)
+	}
+
+	logger.SetLevel(log.Info)
+	logger.Info("atinfo")
+	logger.Debug("atdebug")
+
+	bs = buf.String()
+	if !strings.Contains(bs, "atinfo") {
+		t.Fatalf("didn't write at Info level")
+	}
+	if strings.Contains(bs, "atdebug") {
+		t.Fatalf("didn't respect Info level, got %q", bs)
+	}
+
+	logger.SetLevel(log.Debug)
+	logger.Debug("atdebug")
+
+	bs = buf.String()
+	if !strings.Contains(bs, "atdebug") {
+		t.Fatalf("didn't write at Debug level")
+	}
 }
-
-func TestEnterRegion(t *testing.T) {
-	var log log.Logger
-
-	ctx, rlog, region := log.ForRegion(ctx, "someRegion")
-}
-
-type Server struct {
-	logger *log.Logger
-}
-
-func (srv *Server) newTask(ctx context.Context, taskType string) (context.Context, *log.Logger, *trace.Task) {
-	tctx, task := trace.NewTask(ctx, taskType)
-
-}
-
-*/

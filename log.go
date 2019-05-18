@@ -119,6 +119,9 @@ func (l *Logger) Debugf(format string, args ...interface{}) error {
 
 // print emits a log message at the specified level.
 func (l *Logger) print(lv Level, args ...interface{}) error {
+	if l.fields == nil {
+		l.fields = make(Fields)
+	}
 	l.fields[levelKey] = lv
 	l.fields[tsKey] = time.Now().Format(time.RFC3339Nano)
 	l.fields[msgKey] = fmt.Sprint(args...)
@@ -127,6 +130,9 @@ func (l *Logger) print(lv Level, args ...interface{}) error {
 
 // printf emits a formatted log message at the specified level.
 func (l *Logger) printf(lv Level, format string, args ...interface{}) error {
+	if l.fields == nil {
+		l.fields = make(Fields)
+	}
 	l.fields[levelKey] = lv
 	l.fields[tsKey] = time.Now().Format(time.RFC3339Nano)
 	l.fields[msgKey] = fmt.Sprintf(format, args...)
@@ -198,7 +204,7 @@ func (tenc *TextEncoder) Encode(fields Fields) error {
 	tenc.mu.Lock()
 	defer tenc.mu.Unlock()
 
-	_, err := io.WriteString(tenc.w, fields.String())
+	_, err := io.WriteString(tenc.w, fields.String()+"\n")
 	return err
 }
 
@@ -237,22 +243,22 @@ func (jenc *JSONEncoder) Encode(fields Fields) error {
 // TestLogEncoder emits textual log messages to a *testing.T.
 type TestLogEncoder struct {
 	mu sync.Mutex
-	t  *testing.T
+	tb testing.TB
 }
 
 // NewTestLogEncoder constructs a new TestLogEncoder, which writes log lines
-// to t's associated logger.
-func NewTestLogEncoder(t *testing.T) *TestLogEncoder {
-	return &TestLogEncoder{t: t}
+// to tb's associated logger.
+func NewTestLogEncoder(tb testing.TB) *TestLogEncoder {
+	return &TestLogEncoder{tb: tb}
 }
 
 // Encode encodes the specified fields to text, then writes them to the
-// associated *testing.T's log.
+// associated testing.TB's log.
 func (tle *TestLogEncoder) Encode(fields Fields) error {
 	tle.mu.Lock()
 	defer tle.mu.Unlock()
 
-	tle.t.Log(fields.String())
+	tle.tb.Log(fields.String() + "\n")
 	return nil
 }
 
