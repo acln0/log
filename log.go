@@ -109,7 +109,7 @@ func (l *Logger) Debug(args ...interface{}) error {
 	return nil
 }
 
-// Debug emits a formatted log message at the Debug level.
+// Debugf emits a formatted log message at the Debug level.
 func (l *Logger) Debugf(format string, args ...interface{}) error {
 	if l.loadLevel() >= Debug {
 		return l.printf(Debug, format, args...)
@@ -117,6 +117,7 @@ func (l *Logger) Debugf(format string, args ...interface{}) error {
 	return nil
 }
 
+// print emits a log message at the specified level.
 func (l *Logger) print(lv Level, args ...interface{}) error {
 	l.fields[levelKey] = lv
 	l.fields[tsKey] = time.Now()
@@ -124,6 +125,7 @@ func (l *Logger) print(lv Level, args ...interface{}) error {
 	return l.emit()
 }
 
+// printf emits a formatted log message at the specified level.
 func (l *Logger) printf(lv Level, format string, args ...interface{}) error {
 	l.fields[levelKey] = lv
 	l.fields[tsKey] = time.Now()
@@ -131,6 +133,7 @@ func (l *Logger) printf(lv Level, format string, args ...interface{}) error {
 	return l.emit()
 }
 
+// emit merges l.fields with all parent fields, then emits a log message.
 func (l *Logger) emit() error {
 	for parent := l.parent; parent != nil; parent = parent.parent {
 		l.fields.merge(parent.fields)
@@ -253,30 +256,6 @@ func (tle *TestLogEncoder) Encode(fields Fields) error {
 	return nil
 }
 
-// reserved built-in keys
-const (
-	levelKey     = "_level"
-	tsKey        = "_ts"
-	componentKey = "_component"
-	msgKey       = "_msg"
-)
-
-var builtinKeys = []string{
-	levelKey,
-	tsKey,
-	componentKey,
-	msgKey,
-}
-
-func isBuiltinKey(key string) bool {
-	for _, bk := range builtinKeys {
-		if bk == key {
-			return true
-		}
-	}
-	return false
-}
-
 // Fields is a collection of fields in a structured log entry.
 type Fields map[string]interface{}
 
@@ -326,4 +305,28 @@ func (f Fields) merge(other Fields) {
 	for k, v := range other {
 		f[k] = v
 	}
+}
+
+// reserved built-in keys
+const (
+	levelKey     = "_level"
+	tsKey        = "_ts"
+	componentKey = "_component"
+	msgKey       = "_msg"
+)
+
+var builtinKeys = []string{
+	levelKey,
+	tsKey,
+	componentKey,
+	msgKey,
+}
+
+func isBuiltinKey(key string) bool {
+	for _, bk := range builtinKeys {
+		if bk == key {
+			return true
+		}
+	}
+	return false
 }
