@@ -269,10 +269,21 @@ type Fields map[string]interface{}
 func (f Fields) String() string {
 	var sb strings.Builder
 
-	for _, key := range f.Keys() {
+	keys := f.Keys()
+
+	for i, key := range keys {
 		sb.WriteString(key)
 		sb.WriteString("=")
-		sb.WriteString(fmt.Sprint(f[key]))
+
+		value := fmt.Sprint(f[key])
+		if strings.ContainsAny(value, " \n\t") {
+			value = fmt.Sprintf("%q", value)
+		}
+		sb.WriteString(value)
+
+		if i < len(keys) - 1 {
+			sb.WriteString(" ")
+		}
 	}
 
 	return sb.String()
