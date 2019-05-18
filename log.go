@@ -55,8 +55,7 @@ const (
 	Debug
 )
 
-// Logger is a structured, leveled logger which integrates with the Go runtime
-// task and region tracing facilities provided by package runtime/trace.
+// Logger is a structured, leveled logger.
 type Logger struct {
 	parent *Logger
 	level  *Level // pointer to Level, to avoid alignment issues
