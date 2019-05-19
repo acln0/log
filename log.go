@@ -23,7 +23,6 @@ import (
 	"strings"
 	"sync"
 	"sync/atomic"
-	"testing"
 	"time"
 	"unicode"
 )
@@ -281,7 +280,12 @@ var _ Sink = (*JSONSink)(nil)
 // must not be copied.
 type TestLogSink struct {
 	mu sync.Mutex
-	TB testing.TB
+	TB TB
+}
+
+// TB is the portion of testing.TB TestLogSink uses.
+type TB interface {
+	Log(args ...interface{})
 }
 
 // Drain encodes the specified key-value pairs to text, then writes them
