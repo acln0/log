@@ -155,7 +155,7 @@ func (l *Logger) print(lv Level, args ...interface{}) error {
 		l.kv = make(KV)
 	}
 	l.kv[LevelKey] = lv
-	l.kv[TSKey] = time.Now().Format(time.RFC3339Nano)
+	l.kv[TimestampKey] = time.Now().Format(time.RFC3339Nano)
 	l.kv[MsgKey] = fmt.Sprint(args...)
 	return l.emit()
 }
@@ -166,7 +166,7 @@ func (l *Logger) printf(lv Level, format string, args ...interface{}) error {
 		l.kv = make(KV)
 	}
 	l.kv[LevelKey] = lv
-	l.kv[TSKey] = time.Now().Format(time.RFC3339Nano)
+	l.kv[TimestampKey] = time.Now().Format(time.RFC3339Nano)
 	l.kv[MsgKey] = fmt.Sprintf(format, args...)
 	return l.emit()
 }
@@ -395,7 +395,7 @@ func (kv KV) merge(other KV) {
 // Reserved built-in keys
 const (
 	LevelKey     = "_level"
-	TSKey        = "_ts"
+	TimestampKey = "_ts"
 	ComponentKey = "_component"
 	TaskKey      = "_task"
 	RegionKey    = "_region"
@@ -404,7 +404,7 @@ const (
 
 var builtinKeys = []string{
 	LevelKey,
-	TSKey,
+	TimestampKey,
 	ComponentKey,
 	TaskKey,
 	RegionKey,
