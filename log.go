@@ -213,8 +213,8 @@ func (l *Logger) setKV(kv KV) *Logger {
 // of Sink must be safe for concurrent use.
 //
 // Implementations of Sink which produce output where the order of key-value
-// pairs is significant should use KV.Keys to determine the order prescribed
-// by this package.
+// pairs is significant should use KV.SortedKeys to determine the order
+// prescribed by this package.
 //
 // Implementations of Sink must not modify KV maps.
 type Sink interface {
@@ -324,7 +324,7 @@ type KV map[string]interface{}
 func (kv KV) String() string {
 	var sb strings.Builder
 
-	keys := kv.Keys()
+	keys := kv.SortedKeys()
 
 	for i, key := range keys {
 		sb.WriteString(key)
@@ -353,11 +353,11 @@ func shouldQuote(s string) bool {
 	return idx != -1
 }
 
-// Keys returns all keys in the map, sorted in the order prescribed by
-// this package.  Built-in keys go first, in the order "_level", "_ts",
+// SortedKeys returns all keys in the map, sorted in the order prescribed
+// by this package.  Built-in keys go first, in the order "_level", "_ts",
 // "_component", "_task", "_region", "msg", followed by user-defined keys,
 // sorted lexicographically.
-func (kv KV) Keys() []string {
+func (kv KV) SortedKeys() []string {
 	return append(kv.builtin(), kv.user()...)
 }
 
