@@ -60,13 +60,14 @@ const (
 type Logger struct {
 	parent *Logger
 	level  *Level // pointer to Level, to avoid alignment issues
-	enc    Encoder
+	sink   Sink
 	kv     KV
 }
 
-// New creates a new Logger which encodes logs to enc.
-func New(enc Encoder, lv Level) *Logger {
-	return &Logger{enc: enc, level: &lv}
+// New creates a new Logger which forwards logs at or below the specified
+// level to the specified Sink.
+func New(sink Sink, lv Level) *Logger {
+	return &Logger{level: &lv, sink: sink}
 }
 
 // ForComponent returns a Logger for the specified component.
@@ -175,7 +176,7 @@ func (l *Logger) emit() error {
 	for parent := l.parent; parent != nil; parent = parent.parent {
 		l.kv.merge(parent.kv)
 	}
-	return l.enc.Encode(l.kv)
+	return l.sink.Drain(l.kv)
 }
 
 func (l *Logger) loadLevel() Level {
@@ -183,12 +184,12 @@ func (l *Logger) loadLevel() Level {
 }
 
 // derive returns a new logger derived from l. The new logger has .parent l, and
-// inherits the level and kv's.
+// inherits the level and sink.
 func (l *Logger) derive() *Logger {
 	return &Logger{
 		parent: l,
 		level:  l.level,
-		enc:    l.enc,
+		sink:   l.sink,
 	}
 }
 
@@ -208,80 +209,113 @@ func (l *Logger) setKV(kv KV) *Logger {
 	return l
 }
 
-// An Encoder encodes key-value pairs and produces a log
-// message. Implementations of Encoder must be safe for concurrent
-// use. Implementations of Encoder which produce output where the order
-// of key-value pairs matters should use KV.Keys to determine the order
-// prescribed by this package.
-type Encoder interface {
-	Encode(KV) error
+// A Sink encodes key-value pairs and produces a log message. Implementations
+// of Sink must be safe for concurrent use.
+//
+// Implementations of Sink which produce output where the order of key-value
+// pairs is significant should use KV.Keys to determine the order prescribed
+// by this package.
+//
+// Implementations of Sink must not modify KV maps.
+type Sink interface {
+	Drain(KV) error
 }
 
-// TextEncoder emits textual log messages to an output stream. TextEncoder
-// values must not be copied.
-type TextEncoder struct {
+// TextSink emits textual log messages to an output stream. TextSink values
+// must not be copied.
+type TextSink struct {
 	mu     sync.Mutex
 	Output io.Writer
 }
 
-// Encode encodes the specified key-value pairs to text, then writes them out.
+// Drain encodes the specified key-value pairs to text, then writes them to
+// the underlying io.Writer, followed by a newline.
+//
 // Values are formatted using fmt.Sprint. If the textual representation of
 // values contains whitespace or unprintable characters (in accordance with
-// unicode.IsPrint), the values are quoted. Encode makes a single Write call
-// to the underlying io.Writer.
-func (tenc *TextEncoder) Encode(kv KV) error {
-	tenc.mu.Lock()
-	defer tenc.mu.Unlock()
+// unicode.IsSpace and unicode.IsPrint), the values are quoted.
+//
+// Drain makes a single Write call to the underlying io.Writer.
+func (ts *TextSink) Drain(kv KV) error {
+	ts.mu.Lock()
+	defer ts.mu.Unlock()
 
-	_, err := io.WriteString(tenc.Output, kv.String()+"\n")
+	_, err := io.WriteString(ts.Output, kv.String()+"\n")
 	return err
 }
 
-// JSONEncoder emits JSON objects to an output stream. JSONEncoder values
-// must not be copied.
-type JSONEncoder struct {
+var _ Sink = (*TextSink)(nil)
+
+// JSONSink emits JSON objects to an output stream. JSONSink values must
+// not be copied.
+type JSONSink struct {
 	mu     sync.Mutex
 	Output io.Writer
 }
 
-// Encode encodes the specified key-value pairs to JSON, then writes them out.
+// Drain encodes the specified key-value pairs to JSON, then writes them out
+// to the underyling io.Writer.
 //
-// When using JSONEncoder, callers must ensure that all values in the KV
-// map can be JSON-encoded, otherwise the resulting object may be malformed,
+// When using JSONSink, callers must ensure that all values in the KV map
+// can be JSON-encoded, otherwise the resulting object may be malformed,
 // or encoding might fail.
 //
-// Encode makes a single Write call to the underlying io.Writer.
-func (jenc *JSONEncoder) Encode(kv KV) error {
+// Drain makes a single Write call to the underlying io.Writer.
+func (js *JSONSink) Drain(kv KV) error {
 	buf := new(bytes.Buffer)
 	enc := json.NewEncoder(buf)
 	if err := enc.Encode(kv); err != nil {
 		return err
 	}
 
-	jenc.mu.Lock()
-	defer jenc.mu.Unlock()
+	js.mu.Lock()
+	defer js.mu.Unlock()
 
-	_, err := jenc.Output.Write(buf.Bytes())
+	_, err := js.Output.Write(buf.Bytes())
 	return err
 }
 
-// TestLogEncoder emits textual log messages to a testing.TB. TestLogEncoder
-// values must not be copied.
-type TestLogEncoder struct {
+var _ Sink = (*JSONSink)(nil)
+
+// TestLogSink emits textual log messages to a testing.TB. TestLogSink values
+// must not be copied.
+type TestLogSink struct {
 	mu sync.Mutex
 	TB testing.TB
 }
 
-// Encode encodes the specified key-value pairs to text, then writes them
-// to the associated testing.TB's log. The encoding is identical to that
-// of TextEncoder.
-func (tle *TestLogEncoder) Encode(kv KV) error {
-	tle.mu.Lock()
-	defer tle.mu.Unlock()
+// Drain encodes the specified key-value pairs to text, then writes them
+// to the associated testing.TB's log. The encoding is identical to that of
+// TextSink, except for the trailing newline, which is omitted.
+func (tls *TestLogSink) Drain(kv KV) error {
+	tls.mu.Lock()
+	defer tls.mu.Unlock()
 
-	tle.TB.Log(kv.String())
+	tls.TB.Log(kv.String())
 	return nil
 }
+
+var _ Sink = (*TestLogSink)(nil)
+
+// Tee is a Sink which sends KVs to all sinks it contains.
+type Tee []Sink
+
+// Drain sends kv to all sinks contained in t. If Sink.Drain returns an
+// error for any Sink, Drain records the first such error and returns it.
+func (t Tee) Drain(kv KV) error {
+	var err error
+
+	for _, sink := range t {
+		derr := sink.Drain(kv)
+		if derr != nil && err == nil {
+			err = derr
+		}
+	}
+
+	return err
+}
+
+var _ Sink = (Tee)(nil)
 
 // KV is a collection of key-value pairs.
 type KV map[string]interface{}

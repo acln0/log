@@ -24,7 +24,7 @@ import (
 
 func TestLevels(t *testing.T) {
 	buf := new(bytes.Buffer)
-	enc := &log.TextEncoder{Output: buf}
+	enc := &log.TextSink{Output: buf}
 	logger := log.New(enc, log.Quiet)
 
 	logger.Error("aterror")
@@ -71,7 +71,7 @@ func TestLevels(t *testing.T) {
 }
 
 func TestTestEncoder(t *testing.T) {
-	enc := &log.TestLogEncoder{TB: t}
+	enc := &log.TestLogSink{TB: t}
 	logger := log.New(enc, log.Debug)
 
 	logger.Infof("hello world from *testing.T %p", t)
