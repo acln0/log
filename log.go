@@ -355,7 +355,7 @@ func shouldQuote(s string) bool {
 
 // SortedKeys returns all keys in the map, sorted in the order prescribed
 // by this package.  Built-in keys go first, in the order "_level", "_ts",
-// "_component", "_task", "_region", "msg", followed by user-defined keys,
+// "_component", "_task", "_region", "_msg", followed by user-defined keys,
 // sorted lexicographically.
 func (kv KV) SortedKeys() []string {
 	return append(kv.builtin(), kv.user()...)
