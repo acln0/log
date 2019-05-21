@@ -155,32 +155,28 @@ func (l *Logger) Debugf(format string, args ...interface{}) error {
 
 // print emits a log message at the specified level.
 func (l *Logger) print(lv Level, args ...interface{}) error {
-	if l.kv == nil {
-		l.kv = make(KV)
-	}
-	l.kv[LevelKey] = lv
-	l.kv[TimestampKey] = time.Now().Format(time.RFC3339Nano)
-	l.kv[MsgKey] = fmt.Sprint(args...)
-	return l.emit()
+	kv := make(KV)
+	kv[LevelKey] = lv
+	kv[TimestampKey] = time.Now().Format(time.RFC3339Nano)
+	kv[MsgKey] = fmt.Sprint(args...)
+	return l.emit(kv)
 }
 
 // printf emits a formatted log message at the specified level.
 func (l *Logger) printf(lv Level, format string, args ...interface{}) error {
-	if l.kv == nil {
-		l.kv = make(KV)
-	}
-	l.kv[LevelKey] = lv
-	l.kv[TimestampKey] = time.Now().Format(time.RFC3339Nano)
-	l.kv[MsgKey] = fmt.Sprintf(format, args...)
-	return l.emit()
+	kv := make(KV)
+	kv[LevelKey] = lv
+	kv[TimestampKey] = time.Now().Format(time.RFC3339Nano)
+	kv[MsgKey] = fmt.Sprintf(format, args...)
+	return l.emit(kv)
 }
 
-// emit merges l.kv with all parent KV's, then emits a log message.
-func (l *Logger) emit() error {
-	for parent := l.parent; parent != nil; parent = parent.parent {
-		l.kv.merge(parent.kv)
+// emit merges kv with all parent KV's, then emits a log message.
+func (l *Logger) emit(kv KV) error {
+	for parent := l; parent != nil; parent = parent.parent {
+		kv.merge(parent.kv)
 	}
-	return l.sink.Drain(l.kv)
+	return l.sink.Drain(kv)
 }
 
 func (l *Logger) loadLevel() Level {
