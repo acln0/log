@@ -47,6 +47,11 @@ func (lv Level) String() string {
 	return ""
 }
 
+// MarshalJSON marshals lv as a JSON string.
+func (lv Level) MarshalJSON() ([]byte, error) {
+	return []byte(lv.String()), nil
+}
+
 // Supported log levels.
 const (
 	Quiet Level = iota
