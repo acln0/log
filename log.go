@@ -49,7 +49,7 @@ func (lv Level) String() string {
 
 // MarshalJSON marshals lv as a JSON string.
 func (lv Level) MarshalJSON() ([]byte, error) {
-	return []byte(lv.String()), nil
+	return json.Marshal(lv.String())
 }
 
 // Supported log levels.
