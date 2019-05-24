@@ -277,31 +277,6 @@ func (js *JSONSink) Drain(kv KV) error {
 
 var _ Sink = (*JSONSink)(nil)
 
-// TestLogSink emits textual log messages to a testing.TB. TestLogSink values
-// must not be copied.
-type TestLogSink struct {
-	mu sync.Mutex
-	TB TB
-}
-
-// TB is the portion of testing.TB TestLogSink uses.
-type TB interface {
-	Log(args ...interface{})
-}
-
-// Drain encodes the specified key-value pairs to text, then writes them
-// to the associated testing.TB's log. The encoding is identical to that of
-// TextSink, except for the trailing newline, which is omitted.
-func (tls *TestLogSink) Drain(kv KV) error {
-	tls.mu.Lock()
-	defer tls.mu.Unlock()
-
-	tls.TB.Log(kv.String())
-	return nil
-}
-
-var _ Sink = (*TestLogSink)(nil)
-
 // Tee is a Sink which sends KVs to all sinks it contains.
 type Tee []Sink
 

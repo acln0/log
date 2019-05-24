@@ -69,10 +69,3 @@ func TestLevels(t *testing.T) {
 		t.Fatalf("didn't write at Debug level")
 	}
 }
-
-func TestTestEncoder(t *testing.T) {
-	enc := &log.TestLogSink{TB: t}
-	logger := log.New(enc, log.Debug)
-
-	logger.Infof("hello world from *testing.T %p", t)
-}
