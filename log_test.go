@@ -16,6 +16,7 @@ package log_test
 
 import (
 	"bytes"
+	"errors"
 	"strings"
 	"testing"
 
@@ -27,9 +28,9 @@ func TestLevels(t *testing.T) {
 	enc := &log.TextSink{Output: buf}
 	logger := log.New(enc, log.Quiet)
 
-	logger.Error("aterror")
-	logger.Info("atinfo")
-	logger.Debug("atdebug")
+	logger.Error(errors.New("aterror"))
+	logger.Info(log.KV{"message": "atinfo"})
+	logger.Debug(log.KV{"message": "atdebug"})
 
 	if buf.Len() > 0 {
 		t.Fatalf("wrote logs at Quiet level: %q", buf.String())
@@ -37,9 +38,9 @@ func TestLevels(t *testing.T) {
 
 	logger.SetLevel(log.Error)
 
-	logger.Error("aterror")
-	logger.Info("atinfo")
-	logger.Debug("atdebug")
+	logger.Error(errors.New("aterror"))
+	logger.Info(log.KV{"message": "atinfo"})
+	logger.Debug(log.KV{"message": "atdebug"})
 
 	bs := buf.String()
 	if !strings.Contains(bs, "aterror") {
@@ -50,8 +51,8 @@ func TestLevels(t *testing.T) {
 	}
 
 	logger.SetLevel(log.Info)
-	logger.Info("atinfo")
-	logger.Debug("atdebug")
+	logger.Info(log.KV{"message": "atinfo"})
+	logger.Debug(log.KV{"message": "atdebug"})
 
 	bs = buf.String()
 	if !strings.Contains(bs, "atinfo") {
@@ -62,7 +63,7 @@ func TestLevels(t *testing.T) {
 	}
 
 	logger.SetLevel(log.Debug)
-	logger.Debug("atdebug")
+	logger.Debug(log.KV{"message": "atdebug"})
 
 	bs = buf.String()
 	if !strings.Contains(bs, "atdebug") {

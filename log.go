@@ -96,8 +96,8 @@ func (l *Logger) ForRegion(region string) *Logger {
 // WithKV returns a new Logger which logs messages with the specified
 // key-value pairs. The keys "_level", "_ts", "_component", "_task",
 // "_region", and "_msg" are reserved.
-func (l *Logger) WithKV(kv KV) *Logger {
-	return l.derive().setKV(kv)
+func (l *Logger) WithKV(kver ...KVer) *Logger {
+	return l.derive().setKV(kver...)
 }
 
 // SetLevel sets the log level to lv.
@@ -106,73 +106,36 @@ func (l *Logger) SetLevel(lv Level) {
 }
 
 // Error emits a log message at the Error level.
-func (l *Logger) Error(args ...interface{}) error {
-	if l.loadLevel() >= Error {
-		return l.print(Error, args...)
-	}
-	return nil
-}
-
-// Errorf emits a formatted log message at the Error level.
-func (l *Logger) Errorf(format string, args ...interface{}) error {
-	if l.loadLevel() >= Error {
-		return l.printf(Error, format, args...)
-	}
-	return nil
+func (l *Logger) Error(err error, kvers ...KVer) error {
+	return l.emit(Error, err, kvers...)
 }
 
 // Info emits a log message at the Info level.
-func (l *Logger) Info(args ...interface{}) error {
-	if l.loadLevel() >= Info {
-		return l.print(Info, args...)
-	}
-	return nil
-}
-
-// Infof emits a formatted log message at the Info level.
-func (l *Logger) Infof(format string, args ...interface{}) error {
-	if l.loadLevel() >= Info {
-		return l.printf(Info, format, args...)
-	}
-	return nil
+func (l *Logger) Info(kvers ...KVer) error {
+	return l.emit(Info, nil, kvers...)
 }
 
 // Debug emits a log message at the Debug level.
-func (l *Logger) Debug(args ...interface{}) error {
-	if l.loadLevel() >= Debug {
-		return l.print(Debug, args...)
-	}
-	return nil
+func (l *Logger) Debug(kvers ...KVer) error {
+	return l.emit(Debug, nil, kvers...)
 }
 
-// Debugf emits a formatted log message at the Debug level.
-func (l *Logger) Debugf(format string, args ...interface{}) error {
-	if l.loadLevel() >= Debug {
-		return l.printf(Debug, format, args...)
+// emit emits a log message at the specified level. It creates a KV with
+// level and timestamp keys, adds an error key if err is not nil, merges it
+// with the other KVs, as well as all parent KV's, then emits a log message.
+func (l *Logger) emit(lv Level, err error, others ...KVer) error {
+	if l.loadLevel() < lv {
+		return nil
 	}
-	return nil
-}
-
-// print emits a log message at the specified level.
-func (l *Logger) print(lv Level, args ...interface{}) error {
 	kv := make(KV)
 	kv[LevelKey] = lv
 	kv[TimestampKey] = time.Now().Format(time.RFC3339Nano)
-	kv[MsgKey] = fmt.Sprint(args...)
-	return l.emit(kv)
-}
-
-// printf emits a formatted log message at the specified level.
-func (l *Logger) printf(lv Level, format string, args ...interface{}) error {
-	kv := make(KV)
-	kv[LevelKey] = lv
-	kv[TimestampKey] = time.Now().Format(time.RFC3339Nano)
-	kv[MsgKey] = fmt.Sprintf(format, args...)
-	return l.emit(kv)
-}
-
-// emit merges kv with all parent KV's, then emits a log message.
-func (l *Logger) emit(kv KV) error {
+	if err != nil {
+		kv[ErrorKey] = err.Error()
+	}
+	for _, other := range others {
+		kv.merge(other.KV())
+	}
 	for parent := l; parent != nil; parent = parent.parent {
 		kv.merge(parent.kv)
 	}
@@ -204,7 +167,11 @@ func (l *Logger) set(key string, value interface{}) *Logger {
 
 // setKV replaces l.kv with the specified key-value pairs. Returns l for
 // convenience when chaining.
-func (l *Logger) setKV(kv KV) *Logger {
+func (l *Logger) setKV(kvers ...KVer) *Logger {
+	kv := make(KV)
+	for _, kver := range kvers {
+		kv.merge(kver.KV())
+	}
 	l.kv = kv
 	return l
 }
@@ -297,6 +264,11 @@ func (t Tee) Drain(kv KV) error {
 
 var _ Sink = (Tee)(nil)
 
+// KVer is any type which can represent itself as a key-value pair.
+type KVer interface {
+	KV() KV
+}
+
 // KV is a collection of key-value pairs.
 type KV map[string]interface{}
 
@@ -333,9 +305,14 @@ func shouldQuote(s string) bool {
 	return idx != -1
 }
 
+// KV returns kv.
+func (kv KV) KV() KV {
+	return kv
+}
+
 // SortedKeys returns all keys in the map, sorted in the order prescribed
 // by this package.  Built-in keys go first, in the order "_level", "_ts",
-// "_component", "_task", "_region", "_msg", followed by user-defined keys,
+// "_component", "_task", "_region", "_error", followed by user-defined keys,
 // sorted lexicographically.
 func (kv KV) SortedKeys() []string {
 	return append(kv.builtin(), kv.user()...)
@@ -365,10 +342,13 @@ func (kv KV) user() []string {
 }
 
 // merge merges kv with another set of key-value pairs, storing the resulting
-// keys and values in kv.
+// keys and values in kv. Keys that exist in kv take precedence over keys that
+// exist in the other map.
 func (kv KV) merge(other KV) {
 	for k, v := range other {
-		kv[k] = v
+		if _, ok := kv[k]; !ok {
+			kv[k] = v
+		}
 	}
 }
 
@@ -379,7 +359,7 @@ const (
 	ComponentKey = "_component"
 	TaskKey      = "_task"
 	RegionKey    = "_region"
-	MsgKey       = "_msg"
+	ErrorKey     = "_errors"
 )
 
 var builtinKeys = []string{
@@ -388,7 +368,7 @@ var builtinKeys = []string{
 	ComponentKey,
 	TaskKey,
 	RegionKey,
-	MsgKey,
+	ErrorKey,
 }
 
 func isBuiltinKey(key string) bool {
