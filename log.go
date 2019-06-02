@@ -25,6 +25,8 @@ import (
 	"sync/atomic"
 	"time"
 	"unicode"
+
+	"acln.ro/hiername"
 )
 
 // Level represents a log level.
@@ -74,23 +76,35 @@ func New(sink Sink, lv Level) *Logger {
 	return &Logger{level: &lv, sink: sink}
 }
 
-// ForComponent returns a Logger for the specified component.
+// ForComponent returns a Logger for the specified component. If a component
+// key exists in one of the parent loggers, the specified component name is
+// appended to it in the returned logger, per acln.ro/hiername.
 func (l *Logger) ForComponent(component string) *Logger {
-	return l.derive().set(ComponentKey, component)
+	parentComponent := l.findParentString(ComponentKey)
+	cname := hiername.Append(parentComponent, component)
+	return l.derive().set(ComponentKey, cname)
 }
 
-// ForTask returns a Logger for the specified task. ForTask is intended
-// to be used in conjunction with a *runtime/trace.Task. By convention,
-// the task names should match.
+// ForTask returns a Logger for the specified task. ForTask is intended to be
+// used in conjunction with a *runtime/trace.Task. By convention, the task
+// names should match. If a task key exists in one of the parent loggers,
+// the specified task name is appended to it in the returned logger, per
+// acln.ro/hiername.
 func (l *Logger) ForTask(task string) *Logger {
-	return l.derive().set(TaskKey, task)
+	parentTask := l.findParentString(TaskKey)
+	tname := hiername.Append(parentTask, task)
+	return l.derive().set(TaskKey, tname)
 }
 
-// ForRegion returns a Logger for the specified region. ForRegion is
-// intended to be used in conjunction with a *runtime/trace.Region. By
-// convention, the region names should match.
+// ForRegion returns a Logger for the specified region. ForRegion is intended
+// to be used in conjunction with a *runtime/trace.Region. By convention,
+// the region names should match. If a region key exists in one of the
+// parent loggers, the specified region name is appended to it in the
+// returned logger, per acln.ro/hiername.
 func (l *Logger) ForRegion(region string) *Logger {
-	return l.derive().set(RegionKey, region)
+	parentRegion := l.findParentString(RegionKey)
+	rname := hiername.Append(parentRegion, region)
+	return l.derive().set(RegionKey, rname)
 }
 
 // WithKV returns a new Logger which logs messages with the specified
@@ -140,6 +154,18 @@ func (l *Logger) emit(lv Level, err error, others ...KVer) error {
 		kv.merge(parent.kv)
 	}
 	return l.sink.Drain(kv)
+}
+
+// findParentString finds the first string value for the specified key in l or l's
+// parents. If no such value exists, findParentKey returns the empty string.
+func (l *Logger) findParentString(key string) string {
+	for ; l != nil; l = l.parent {
+		val := l.kv.stringValue(key)
+		if val != "" {
+			return val
+		}
+	}
+	return ""
 }
 
 func (l *Logger) loadLevel() Level {
@@ -303,6 +329,19 @@ func shouldQuote(s string) bool {
 		return unicode.IsSpace(r) || !unicode.IsPrint(r)
 	})
 	return idx != -1
+}
+
+// stringValue returns the string value for the specified key, if it exists.
+func (kv KV) stringValue(key string) string {
+	val, ok := kv[key]
+	if !ok {
+		return ""
+	}
+	s, ok := val.(string)
+	if !ok {
+		return ""
+	}
+	return s
 }
 
 // KV returns kv.
