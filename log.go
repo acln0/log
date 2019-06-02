@@ -416,7 +416,7 @@ const (
 	ComponentKey = "_component"
 	TaskKey      = "_task"
 	RegionKey    = "_region"
-	ErrorKey     = "_errors"
+	ErrorKey     = "_error"
 )
 
 var builtinKeys = []string{
