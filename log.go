@@ -36,17 +36,25 @@ type Level uint32
 // "quiet", "error", "info", and "debug". If lv is not a supported log level,
 // String returns the empty string.
 func (lv Level) String() string {
-	switch lv {
-	case Quiet:
-		return "quiet"
-	case Error:
-		return "error"
-	case Info:
-		return "info"
-	case Debug:
-		return "debug"
-	}
-	return ""
+	return levelStrings[lv]
+}
+
+func (lv Level) known() bool {
+	return lv == Quiet || lv == Error || lv == Info || lv == Debug
+}
+
+var levelStrings = map[Level]string{
+	Quiet: "quiet",
+	Error: "error",
+	Info:  "info",
+	Debug: "debug",
+}
+
+var levels = map[string]Level{
+	"quiet": Quiet,
+	"error": Error,
+	"info":  Info,
+	"debug": Debug,
 }
 
 // MarshalJSON marshals lv as a JSON string.
@@ -54,9 +62,19 @@ func (lv Level) MarshalJSON() ([]byte, error) {
 	return json.Marshal(lv.String())
 }
 
+// Set implements the flag.Value.Set method.
+func (lv *Level) Set(s string) error {
+	tmp := levels[s]
+	if !tmp.known() {
+		return fmt.Errorf("log: unknown level %q", s)
+	}
+	*lv = tmp
+	return nil
+}
+
 // Supported log levels.
 const (
-	Quiet Level = iota
+	Quiet Level = 1 + iota
 	Error
 	Info
 	Debug
