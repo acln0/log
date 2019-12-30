@@ -418,6 +418,14 @@ func (op Op) KV() KV {
 	return KV{"op": string(op)}
 }
 
+// Event represents an event. It occupies the "event" key in a KV.
+type Event string
+
+// KV returns a KV with the event name under the key "event".
+func (ev Event) KV() KV {
+	return KV{"event": string(ev)}
+}
+
 // Reserved built-in keys
 const (
 	LevelKey     = "level"
