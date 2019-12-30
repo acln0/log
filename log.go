@@ -126,8 +126,8 @@ func (l *Logger) ForRegion(region string) *Logger {
 }
 
 // WithKV returns a new Logger which logs messages with the specified
-// key-value pairs. The keys "_level", "_ts", "_component", "_task",
-// "_region", and "_msg" are reserved.
+// key-value pairs. The keys "level", "ts", "component", "task",
+// "region", "error", and "msg" are reserved.
 func (l *Logger) WithKV(kver ...KVer) *Logger {
 	return l.derive().setKV(kver...)
 }
@@ -275,6 +275,7 @@ type JSONSink struct {
 func (js *JSONSink) Drain(kv KV) error {
 	buf := new(bytes.Buffer)
 	enc := json.NewEncoder(buf)
+	enc.SetIndent("", "\t")
 	if err := enc.Encode(kv); err != nil {
 		return err
 	}
@@ -368,8 +369,8 @@ func (kv KV) KV() KV {
 }
 
 // SortedKeys returns all keys in the map, sorted in the order prescribed
-// by this package.  Built-in keys go first, in the order "_level", "_ts",
-// "_component", "_task", "_region", "_error", followed by user-defined keys,
+// by this package.  Built-in keys go first, in the order "level", "ts",
+// "component", "task", "region", "error", followed by user-defined keys,
 // sorted lexicographically.
 func (kv KV) SortedKeys() []string {
 	return append(kv.builtin(), kv.user()...)
@@ -409,14 +410,22 @@ func (kv KV) merge(other KV) {
 	}
 }
 
+// Op represents an operation. It occupies the "op" key in a KV.
+type Op string
+
+// KV returns a KV with the operation name under the key "op".
+func (op Op) KV() KV {
+	return KV{"op": string(op)}
+}
+
 // Reserved built-in keys
 const (
-	LevelKey     = "_level"
-	TimestampKey = "_ts"
-	ComponentKey = "_component"
-	TaskKey      = "_task"
-	RegionKey    = "_region"
-	ErrorKey     = "_error"
+	LevelKey     = "level"
+	TimestampKey = "ts"
+	ComponentKey = "component"
+	TaskKey      = "task"
+	RegionKey    = "region"
+	ErrorKey     = "error"
 )
 
 var builtinKeys = []string{
